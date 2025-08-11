@@ -1,0 +1,33 @@
+name: workflow-dev.yml
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image locally
+        run: |
+          docker build -t ${{ github.event.repository.name }}:latest .
+
+  deploy_local:
+    needs: build
+    runs-on: self-hosted
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check for docker-compose file
+        run: |
+          if [ ! -f docker-compose.yaml ]; then
+            echo "Error: docker-compose.yaml not found"
+            exit 1
+          fi
+
+      - name: Deploy local stack
+        run: |
+          docker stack deploy -c docker-compose.yaml ${{ github.event.repository.name }} || { echo "Deployment failed"; exit 1; }
