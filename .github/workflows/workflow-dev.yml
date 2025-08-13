@@ -43,9 +43,11 @@ jobs:
           IMAGE_NAME=${{ needs.build.outputs.image_name }}
           echo "Deploying $IMAGE_NAME"
 
-          # Replace IMAGE_NAME in compose and deploy
-          env IMAGE_NAME=$IMAGE_NAME docker stack deploy \
-            -c <(envsubst < docker-compose.yaml) \
+          # Create temp compose file with IMAGE_NAME replaced
+          env IMAGE_NAME=$IMAGE_NAME envsubst < docker-compose.yaml > docker-compose.rendered.yaml
+
+          docker stack deploy \
+            -c docker-compose.rendered.yaml \
             $SERVICE_NAME --with-registry-auth --resolve-image never
 
   cleanup:
