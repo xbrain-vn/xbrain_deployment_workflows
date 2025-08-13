@@ -17,15 +17,16 @@ jobs:
     runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
-
-      - name: Build image with unique tag
+      - name: Set image name
+        id: set-image-name
         run: |
           SERVICE_NAME=${{ inputs.service_name || github.event.repository.name }}
           IMAGE_TAG=${GITHUB_SHA::8}
           IMAGE_NAME="$SERVICE_NAME:$IMAGE_TAG"
-          echo "IMAGE_NAME=$IMAGE_NAME" >> $GITHUB_ENV
-          docker build -t $IMAGE_NAME .
-          docker image prune -f
+          echo "image_name=$IMAGE_NAME" >> $GITHUB_OUTPUT
+      - name: Build image with unique tag
+        run: |
+          docker build -t "${{ steps.set-image-name.outputs.image_name }}" .
 
   deploy_local:
     needs: build
@@ -33,20 +34,11 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Check for docker-compose file
-        run: |
-          if [ ! -f docker-compose.yaml ]; then
-            echo "Error: docker-compose.yaml not found"
-            exit 1
-          fi
-
       - name: Deploy stack with dynamic image tag
         run: |
           SERVICE_NAME=${{ inputs.service_name || github.event.repository.name }}
-          IMAGE_NAME=${{ env.IMAGE_NAME }}
-          
-          # Substitute IMAGE_NAME into docker-compose before deploying
+          IMAGE_NAME=${{ needs.build.outputs.image_name }}
+          # Replace IMAGE_NAME in compose and deploy
           env IMAGE_NAME=$IMAGE_NAME docker stack deploy \
             -c <(envsubst < docker-compose.yaml) \
             $SERVICE_NAME --with-registry-auth --resolve-image never
